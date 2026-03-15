@@ -1,0 +1,5 @@
+{
+  "name": "Runity",
+  "description": "A modern running companion for tracking activities, setting goals, and connecting with the community.",
+  "requestFramePermissions": ["geolocation"]
+}

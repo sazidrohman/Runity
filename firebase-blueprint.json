@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user information, Unity Cards, and weekly progress.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase Auth ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "email": { "type": "string", "format": "email" },
+        "unityCards": { "type": "integer", "description": "Number of Unity Cards owned" },
+        "weeklyDistance": { "type": "number", "description": "Distance covered this week in km" },
+        "lastClaimedWeek": { "type": "string", "description": "YYYY-WW format of last claimed card" },
+        "totalDistance": { "type": "number", "description": "Total distance covered" },
+        "photoURL": { "type": "string", "description": "Profile picture URL" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "unityCards", "weeklyDistance"]
+    },
+    "Activity": {
+      "title": "Run Activity",
+      "description": "Stores individual run session data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID who performed the run" },
+        "distance": { "type": "number" },
+        "duration": { "type": "integer", "description": "Duration in seconds" },
+        "pace": { "type": "string" },
+        "calories": { "type": "integer" },
+        "route": { "type": "string" },
+        "path": { "type": "string", "description": "SVG path or coordinates" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "distance", "duration", "timestamp"]
+    },
+    "Post": {
+      "title": "Community Post",
+      "description": "Stores user posts shared to the community feed.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User ID who created the post" },
+        "userName": { "type": "string", "description": "Display name of the user" },
+        "userPhoto": { "type": "string", "description": "Profile picture URL of the user" },
+        "content": { "type": "string", "description": "Text content of the post" },
+        "activityId": { "type": "string", "description": "Optional ID of the shared activity" },
+        "activityData": { "type": "object", "description": "Optional data of the shared activity" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "likes": { "type": "array", "items": { "type": "string" }, "description": "Array of user IDs who liked the post" }
+      },
+      "required": ["userId", "userName", "content", "timestamp"]
+    },
+    "Chat": {
+      "title": "Chat Session",
+      "description": "Stores metadata for a 1-on-1 chat.",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" }, "description": "Array of user IDs in the chat" },
+        "lastMessage": { "type": "string", "description": "Last message sent" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants", "updatedAt"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "Stores individual messages in a chat.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string", "description": "ID of the parent chat" },
+        "senderId": { "type": "string", "description": "User ID of the sender" },
+        "text": { "type": "string", "description": "Message content" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "senderId", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Historical run activities"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Community posts"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a chat"
+    }
+  }
+}

@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth ID
+    //   - name: string (required) - Display name
+    //   - email: string (required) - User email
+    //   - unityCards: int (required) - Card count
+    //   - weeklyDistance: number (required) - Weekly progress
+    //   - lastClaimedWeek: string (optional) - YYYY-WW
+    //   - totalDistance: number (optional) - Lifetime distance
+    //   - createdAt: string (required) - ISO timestamp
+    //
+    // Collection: activities
+    // Document ID: {activityId}
+    // Fields:
+    //   - uid: string (required) - Owner ID
+    //   - distance: number (required) - Run distance
+    //   - duration: int (required) - Run time in seconds
+    //   - pace: string (optional)
+    //   - calories: int (optional)
+    //   - route: string (optional)
+    //   - path: string (optional)
+    //   - timestamp: string (required) - ISO timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Domain Validators
+    
+
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'unityCards', 'weeklyDistance']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.unityCards is int && data.unityCards >= 0 &&
+             data.weeklyDistance is number && data.weeklyDistance >= 0 &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000));
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['uid', 'distance', 'duration', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.distance is number && data.distance >= 0 &&
+             data.duration is int && data.duration >= 0 &&
+             data.timestamp is string;
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAll(['userId', 'userName', 'content', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
+             data.timestamp is string &&
+             (!('userPhoto' in data) || (data.userPhoto is string && data.userPhoto.size() < 1000)) &&
+             (!('likes' in data) || data.likes is list) &&
+             (!('activityId' in data) || data.activityId is string) &&
+             (!('activityData' in data) || data.activityData is map);
+    }
+
+    function isValidChat(data) {
+      return data.keys().hasAll(['participants', 'updatedAt']) &&
+             data.participants is list &&
+             data.participants.size() == 2 &&
+             request.auth.uid in data.participants &&
+             data.updatedAt is string &&
+             (!('lastMessage' in data) || (data.lastMessage is string && data.lastMessage.size() < 1000));
+    }
+
+    function isValidMessage(data, chatId) {
+      return data.keys().hasAll(['chatId', 'senderId', 'text', 'timestamp']) &&
+             data.chatId == chatId &&
+             data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 1000 &&
+             data.timestamp is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /activities/{activityId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && isValidActivity(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isValidActivity(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPost(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && isValidPost(request.resource.data)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) && request.resource.data.likes is list)
+      );
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && isValidChat(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants && isValidChat(request.resource.data);
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isAuthenticated() && 
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                      isValidMessage(request.resource.data, chatId);
+      }
+    }
+  }
+}
